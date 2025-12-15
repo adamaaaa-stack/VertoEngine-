@@ -1,0 +1,110 @@
+{
+  "id": "graph-001",
+  "name": "Basic Example Graph",
+  "version": "1.0.0",
+  "variables": [],
+  "nodes": [
+    {
+      "id": "node-beginplay",
+      "type": "BeginPlay",
+      "category": "Events",
+      "title": "Begin Play",
+      "x": 50,
+      "y": 50,
+      "width": 150,
+      "height": 100,
+      "pins": [
+        {
+          "id": "pin-exec-out-1",
+          "name": "Event",
+          "type": "Exec",
+          "direction": "Output",
+          "nodeId": "node-beginplay"
+        }
+      ],
+      "data": {}
+    },
+    {
+      "id": "node-printstring",
+      "type": "PrintString",
+      "category": "Debug",
+      "title": "Print String",
+      "x": 300,
+      "y": 50,
+      "width": 150,
+      "height": 100,
+      "pins": [
+        {
+          "id": "pin-exec-in-1",
+          "name": "In",
+          "type": "Exec",
+          "direction": "Input",
+          "nodeId": "node-printstring"
+        },
+        {
+          "id": "pin-exec-out-2",
+          "name": "Out",
+          "type": "Exec",
+          "direction": "Output",
+          "nodeId": "node-printstring"
+        },
+        {
+          "id": "pin-string-in-1",
+          "name": "String",
+          "type": "String",
+          "direction": "Input",
+          "nodeId": "node-printstring",
+          "defaultValue": "Hello World"
+        }
+      ],
+      "data": {
+        "string": "Hello World"
+      }
+    },
+    {
+      "id": "node-add",
+      "type": "Add",
+      "category": "Math",
+      "title": "Add",
+      "x": 500,
+      "y": 50,
+      "width": 150,
+      "height": 100,
+      "pins": [
+        {
+          "id": "pin-a-in",
+          "name": "A",
+          "type": "Float",
+          "direction": "Input",
+          "nodeId": "node-add",
+          "defaultValue": 5
+        },
+        {
+          "id": "pin-b-in",
+          "name": "B",
+          "type": "Float",
+          "direction": "Input",
+          "nodeId": "node-add",
+          "defaultValue": 3
+        },
+        {
+          "id": "pin-result-out",
+          "name": "Result",
+          "type": "Float",
+          "direction": "Output",
+          "nodeId": "node-add"
+        }
+      ],
+      "data": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn-1",
+      "fromNodeId": "node-beginplay",
+      "fromPinId": "pin-exec-out-1",
+      "toNodeId": "node-printstring",
+      "toPinId": "pin-exec-in-1"
+    }
+  ]
+}
