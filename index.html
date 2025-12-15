@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VertoEngine - Visual Game Engine</title>
+  <link rel="stylesheet" href="src/ui/styles.css">
+</head>
+<body>
+  <!-- Top Bar -->
+  <div id="topbar">
+    <div class="topbar-left">
+      <h1>VertoEngine</h1>
+    </div>
+    <div class="topbar-center">
+      <button id="btn-new" class="btn">New</button>
+      <button id="btn-open" class="btn">Open</button>
+      <button id="btn-save" class="btn">Save</button>
+      <button id="btn-run" class="btn btn-primary">Run</button>
+      <button id="btn-stop" class="btn btn-danger" disabled>Stop</button>
+    </div>
+    <div class="topbar-right">
+      <span id="status-text">Ready</span>
+    </div>
+  </div>
+
+  <!-- Error Bar -->
+  <div id="errorbar" class="hidden">
+    <span id="error-text"></span>
+    <button id="btn-clear-error" class="btn-icon">×</button>
+  </div>
+
+  <!-- Main Content -->
+  <div id="main-content">
+    <!-- Left Panel: Node Library -->
+    <div id="left-panel">
+      <div class="panel-header">
+        <h2>Nodes</h2>
+      </div>
+      <div class="search-container">
+        <input type="text" id="node-search" placeholder="Add node..." />
+      </div>
+      <div id="node-categories" class="node-list"></div>
+    </div>
+
+    <!-- Center: Canvas -->
+    <div id="center-panel">
+      <div id="canvas-container">
+        <canvas id="node-canvas"></canvas>
+      </div>
+      <div id="game-view-container" class="hidden">
+        <canvas id="game-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Right Panel: Assets -->
+    <div id="right-panel">
+      <div class="panel-header">
+        <h2>Assets</h2>
+      </div>
+      <div class="asset-controls">
+        <button id="btn-import-asset" class="btn">Import Asset</button>
+      </div>
+      <div id="asset-list" class="asset-list"></div>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.ts"></script>
+</body>
+</html>

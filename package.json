@@ -1,0 +1,21 @@
+{
+  "name": "verto-engine",
+  "version": "1.0.0",
+  "description": "Web-based game engine with Unreal Blueprints-equivalent node system",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": ["game-engine", "visual-scripting", "node-editor", "blueprints"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8"
+  },
+  "dependencies": {}
+}
