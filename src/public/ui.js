@@ -65,13 +65,16 @@ function initializeGraph() {
 }
 
 /**
- * Load node library from registry
+ * Load node library from API
  */
 async function loadNodeLibrary() {
   try {
-    // Import node types
-    const { getAvailableNodeTypes } = await import("../nodes/index.js");
-    const categories = getAvailableNodeTypes();
+    // Fetch node types from API
+    const response = await fetch("/api/nodes");
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const categories = await response.json();
 
     const categoriesContainer = document.getElementById("nodeCategories");
     categoriesContainer.innerHTML = "";
@@ -117,6 +120,7 @@ async function loadNodeLibrary() {
     }
   } catch (error) {
     console.error("Failed to load node library:", error);
+    showError("Failed to load node library");
   }
 }
 
@@ -176,33 +180,32 @@ function setupEventListeners() {
  */
 async function createNode(nodeType, x, y) {
   try {
-    const { createNode: createNodeFunc } = await import("../nodes/index.js");
-    const node = createNodeFunc(nodeType, { x, y });
+    // Fetch node from API
+    const response = await fetch(`/api/create-node/${encodeURIComponent(nodeType)}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const nodeData = await response.json();
 
-    if (node) {
+    if (nodeData && !nodeData.error) {
       nodes.push({
-        id: node.id,
+        id: nodeData.id,
         type: nodeType,
-        title: node.title,
+        title: nodeData.title,
         x: x,
         y: y,
-        pins: node.pins.map((p) => ({
-          id: p.id,
-          name: p.name,
-          type: p.type,
-          direction: p.direction,
-          isArray: p.isArray,
-          isMap: p.isMap,
-          isSet: p.isSet,
-        })),
-        data: node.data,
+        pins: nodeData.pins || [],
+        data: nodeData.data || {},
         width: 150,
         height: 100,
       });
       render();
+    } else {
+      showError(`Failed to create node: ${nodeData?.error || "Unknown error"}`);
     }
   } catch (error) {
     console.error("Failed to create node:", error);
+    showError(`Failed to create node: ${error.message}`);
   }
 }
 

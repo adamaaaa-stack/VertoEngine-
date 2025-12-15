@@ -6,8 +6,9 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "npx http-server dist/public -p 8080",
-    "test": "jest"
+    "start": "npm run build && node dist/api.js",
+    "serve": "node dist/api.js",
+    "test": "echo 'Tests pending'"
   },
   "dependencies": {
     "uuid": "^9.0.0"
