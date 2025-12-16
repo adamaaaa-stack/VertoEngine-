@@ -54,6 +54,12 @@ export class NodeCanvas {
   // Grid
   private gridSize: number = 20;
 
+  // Toolbar (iPad)
+  private toolbar: HTMLElement | null = null;
+  private toolbarCopyBtn: HTMLButtonElement | null = null;
+  private toolbarDuplicateBtn: HTMLButtonElement | null = null;
+  private toolbarDeleteBtn: HTMLButtonElement | null = null;
+
   constructor(canvas: HTMLCanvasElement, graph: Graph) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -61,6 +67,7 @@ export class NodeCanvas {
 
     this.setupCanvas();
     this.setupEventListeners();
+    this.setupToolbar();
   }
 
   private setupCanvas(): void {
@@ -92,6 +99,45 @@ export class NodeCanvas {
 
     // Keyboard events
     window.addEventListener('keydown', this.onKeyDown.bind(this));
+  }
+
+  private setupToolbar(): void {
+    this.toolbar = document.getElementById('node-toolbar');
+    this.toolbarCopyBtn = document.getElementById('toolbar-copy') as HTMLButtonElement;
+    this.toolbarDuplicateBtn = document.getElementById('toolbar-duplicate') as HTMLButtonElement;
+    this.toolbarDeleteBtn = document.getElementById('toolbar-delete') as HTMLButtonElement;
+
+    if (this.toolbarCopyBtn) {
+      this.toolbarCopyBtn.addEventListener('click', () => {
+        this.copySelectedNodes();
+        this.updateToolbar();
+      });
+    }
+
+    if (this.toolbarDuplicateBtn) {
+      this.toolbarDuplicateBtn.addEventListener('click', () => {
+        this.duplicateSelectedNodes();
+        this.updateToolbar();
+      });
+    }
+
+    if (this.toolbarDeleteBtn) {
+      this.toolbarDeleteBtn.addEventListener('click', () => {
+        this.deleteSelectedNodes();
+        this.updateToolbar();
+      });
+    }
+  }
+
+  private updateToolbar(): void {
+    if (!this.toolbar) return;
+
+    // Show toolbar only if nodes are selected
+    if (this.selectedNodes.size > 0) {
+      this.toolbar.classList.remove('hidden');
+    } else {
+      this.toolbar.classList.add('hidden');
+    }
   }
 
   // Touch event handlers
@@ -135,6 +181,7 @@ export class NodeCanvas {
         this.dragStartX = x - node.x;
         this.dragStartY = y - node.y;
         this.render();
+        this.updateToolbar();
         return;
       }
 
@@ -145,6 +192,7 @@ export class NodeCanvas {
       this.dragStartX = touch.clientX;
       this.dragStartY = touch.clientY;
       this.render();
+      this.updateToolbar();
     }
   }
 
@@ -260,6 +308,7 @@ export class NodeCanvas {
       this.dragStartX = x - node.x;
       this.dragStartY = y - node.y;
       this.render();
+      this.updateToolbar();
       return;
     }
 
@@ -267,6 +316,7 @@ export class NodeCanvas {
     if (!e.shiftKey) {
       this.selectedNodes.clear();
       this.selectedNode = null;
+      this.updateToolbar();
     }
     this.isDragging = true;
     this.dragStartX = e.clientX;
@@ -354,6 +404,7 @@ export class NodeCanvas {
       this.selectedNodes.add(node.node);
       this.selectedNode = node.node;
       this.render();
+      this.updateToolbar();
     }
 
     // Show context menu
@@ -441,6 +492,7 @@ export class NodeCanvas {
     this.selectedNode = null;
     this.updateConnections();
     this.render();
+    this.updateToolbar();
   }
 
   private onKeyDown(e: KeyboardEvent): void {
@@ -457,6 +509,7 @@ export class NodeCanvas {
       this.selectedNode = null;
       this.updateConnections();
       this.render();
+      this.updateToolbar();
       e.preventDefault();
       return;
     }
@@ -495,6 +548,7 @@ export class NodeCanvas {
       this.selectedNode = null;
       this.connectingFrom = null;
       this.render();
+      this.updateToolbar();
       e.preventDefault();
       return;
     }
@@ -548,6 +602,7 @@ export class NodeCanvas {
 
     this.selectedNode = Array.from(this.selectedNodes)[0] || null;
     this.render();
+    this.updateToolbar();
   }
 
   private duplicateSelectedNodes(): void {
@@ -564,6 +619,7 @@ export class NodeCanvas {
 
     this.selectedNode = Array.from(this.selectedNodes)[0] || null;
     this.render();
+    this.updateToolbar();
   }
 
   /**

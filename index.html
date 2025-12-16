@@ -59,6 +59,18 @@
     <div id="center-panel">
       <div id="canvas-container">
         <canvas id="node-canvas"></canvas>
+        <!-- Floating toolbar for iPad node operations -->
+        <div id="node-toolbar" class="node-toolbar hidden">
+          <button id="toolbar-copy" class="toolbar-btn" title="Copy">
+            <span>📋</span>
+          </button>
+          <button id="toolbar-duplicate" class="toolbar-btn" title="Duplicate">
+            <span>⎘</span>
+          </button>
+          <button id="toolbar-delete" class="toolbar-btn toolbar-btn-danger" title="Delete">
+            <span>🗑️</span>
+          </button>
+        </div>
       </div>
       <div id="game-view-container" class="hidden">
         <canvas id="game-canvas"></canvas>

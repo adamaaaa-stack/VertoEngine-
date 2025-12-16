@@ -396,6 +396,63 @@ body {
   background: #4e4e4e;
 }
 
+/* Floating Node Toolbar (iPad) */
+.node-toolbar {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(45, 45, 45, 0.95);
+  border: 1px solid #4a4a4a;
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.node-toolbar.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(10px);
+}
+
+.toolbar-btn {
+  width: 50px;
+  height: 50px;
+  border: none;
+  border-radius: 8px;
+  background: #3e3e3e;
+  color: #d4d4d4;
+  cursor: pointer;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.toolbar-btn:hover {
+  background: #4e4e4e;
+  transform: scale(1.05);
+}
+
+.toolbar-btn:active {
+  transform: scale(0.95);
+}
+
+.toolbar-btn-danger:hover {
+  background: #e74c3c;
+}
+
+.toolbar-btn span {
+  pointer-events: none;
+}
+
 /* Canvas Node Styles (rendered on canvas) */
 .hidden {
   display: none !important;
