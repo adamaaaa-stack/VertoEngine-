@@ -188,15 +188,12 @@ export class NodeCanvas {
         this.dragStartY = touch.clientY;
         this.render();
       } else if (this.connectingFrom) {
-        // Drawing connection
+        // Drawing connection preview
         this.render();
         const fromPos = this.getPinPosition(this.connectingFrom);
-        this.ctx.strokeStyle = '#4a90e2';
-        this.ctx.lineWidth = 3;
-        this.ctx.beginPath();
-        this.ctx.moveTo(fromPos.x * this.zoom + this.offsetX, fromPos.y * this.zoom + this.offsetY);
-        this.ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
-        this.ctx.stroke();
+        const toX = (touch.clientX - rect.left - this.offsetX) / this.zoom;
+        const toY = (touch.clientY - rect.top - this.offsetY) / this.zoom;
+        this.drawConnectionPreview(fromPos, { x: toX, y: toY });
       }
     }
   }
@@ -307,15 +304,12 @@ export class NodeCanvas {
       this.dragStartY = e.clientY;
       this.render();
     } else if (this.connectingFrom) {
-      // Drawing connection
+      // Drawing connection preview
       this.render();
       const fromPos = this.getPinPosition(this.connectingFrom);
-      this.ctx.strokeStyle = '#4a90e2';
-      this.ctx.lineWidth = 2;
-      this.ctx.beginPath();
-      this.ctx.moveTo(fromPos.x * this.zoom + this.offsetX, fromPos.y * this.zoom + this.offsetY);
-      this.ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-      this.ctx.stroke();
+      const toX = (e.clientX - rect.left - this.offsetX) / this.zoom;
+      const toY = (e.clientY - rect.top - this.offsetY) / this.zoom;
+      this.drawConnectionPreview(fromPos, { x: toX, y: toY });
     }
   }
 
@@ -721,19 +715,96 @@ export class NodeCanvas {
     this.ctx.textAlign = 'left';
   }
 
+  private drawConnectionPreview(fromPos: { x: number; y: number }, toPos: { x: number; y: number }): void {
+    // Calculate distance for curve tension
+    const dx = Math.abs(toPos.x - fromPos.x);
+    const dy = Math.abs(toPos.y - fromPos.y);
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Control point offset - scales with distance
+    const controlPointOffset = Math.min(distance * 0.5, 200);
+
+    // Control points extend horizontally from pins
+    const cp1x = fromPos.x + controlPointOffset;
+    const cp1y = fromPos.y;
+    const cp2x = toPos.x - controlPointOffset;
+    const cp2y = toPos.y;
+
+    // Apply transforms for preview drawing
+    this.ctx.save();
+    this.ctx.translate(this.offsetX, this.offsetY);
+    this.ctx.scale(this.zoom, this.zoom);
+
+    // Draw preview shadow
+    this.ctx.strokeStyle = 'rgba(74, 144, 226, 0.2)';
+    this.ctx.lineWidth = 5;
+    this.ctx.lineCap = 'round';
+    this.ctx.beginPath();
+    this.ctx.moveTo(fromPos.x, fromPos.y);
+    this.ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, toPos.x, toPos.y);
+    this.ctx.stroke();
+
+    // Draw preview connection
+    this.ctx.strokeStyle = '#4a90e2';
+    this.ctx.lineWidth = 3;
+    this.ctx.setLineDash([8, 4]);
+    this.ctx.beginPath();
+    this.ctx.moveTo(fromPos.x, fromPos.y);
+    this.ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, toPos.x, toPos.y);
+    this.ctx.stroke();
+
+    // Reset
+    this.ctx.setLineDash([]);
+    this.ctx.lineCap = 'butt';
+    this.ctx.restore();
+  }
+
   private drawConnection(from: Pin, to: Pin): void {
     const fromPos = this.getPinPosition(from);
     const toPos = this.getPinPosition(to);
 
+    // Calculate distance for curve tension
+    const dx = Math.abs(toPos.x - fromPos.x);
+    const dy = Math.abs(toPos.y - fromPos.y);
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Control point offset - makes the curve more "windy"
+    // Scales with distance for natural looking curves
+    const controlPointOffset = Math.min(distance * 0.5, 200);
+
+    // Control points extend horizontally from pins for flowing curves
+    const cp1x = fromPos.x + controlPointOffset;
+    const cp1y = fromPos.y;
+    const cp2x = toPos.x - controlPointOffset;
+    const cp2y = toPos.y;
+
+    // Draw shadow for depth
+    this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    this.ctx.lineWidth = 5;
+    this.ctx.beginPath();
+    this.ctx.moveTo(fromPos.x + 1, fromPos.y + 2);
+    this.ctx.bezierCurveTo(cp1x + 1, cp1y + 2, cp2x + 1, cp2y + 2, toPos.x + 1, toPos.y + 2);
+    this.ctx.stroke();
+
+    // Draw main connection with color
     this.ctx.strokeStyle = TypeChecker.getColor(from.type);
     this.ctx.lineWidth = 3;
+    this.ctx.lineCap = 'round';
     this.ctx.beginPath();
     this.ctx.moveTo(fromPos.x, fromPos.y);
-
-    // Bezier curve for nice connections
-    const midX = (fromPos.x + toPos.x) / 2;
-    this.ctx.bezierCurveTo(midX, fromPos.y, midX, toPos.y, toPos.x, toPos.y);
+    this.ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, toPos.x, toPos.y);
     this.ctx.stroke();
+
+    // Add subtle highlight on top
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    this.ctx.lineWidth = 1.5;
+    this.ctx.beginPath();
+    this.ctx.moveTo(fromPos.x, fromPos.y - 1);
+    this.ctx.bezierCurveTo(cp1x, cp1y - 1, cp2x, cp2y - 1, toPos.x, toPos.y - 1);
+    this.ctx.stroke();
+
+    // Reset line cap
+    this.ctx.lineCap = 'butt';
   }
 
   private getPinPosition(pin: Pin): { x: number; y: number } {
