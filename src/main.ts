@@ -37,6 +37,11 @@ class VertoEngine {
   private gameCanvas: HTMLCanvasElement;
   private examplesModal: HTMLElement;
   private examplesList: HTMLElement;
+  private btnImportAsset: HTMLButtonElement;
+  private assetList: HTMLElement;
+
+  // Assets
+  private assets: Map<string, { name: string; type: string; data: string | ArrayBuffer }> = new Map();
 
   constructor() {
     // Initialize core
@@ -58,6 +63,8 @@ class VertoEngine {
     this.gameCanvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     this.examplesModal = document.getElementById('examples-modal')!;
     this.examplesList = document.getElementById('examples-list')!;
+    this.btnImportAsset = document.getElementById('btn-import-asset') as HTMLButtonElement;
+    this.assetList = document.getElementById('asset-list')!;
 
     // Initialize canvas
     const nodeCanvasEl = document.getElementById('node-canvas') as HTMLCanvasElement;
@@ -88,6 +95,7 @@ class VertoEngine {
     this.btnExamples.addEventListener('click', () => this.onExamples());
     this.btnRun.addEventListener('click', () => this.onRun());
     this.btnStop.addEventListener('click', () => this.onStop());
+    this.btnImportAsset.addEventListener('click', () => this.onImportAsset());
 
     document.getElementById('btn-clear-error')?.addEventListener('click', () => {
       this.hideError();
@@ -182,8 +190,37 @@ class VertoEngine {
       return;
     }
 
-    // TODO: Implement file loading
-    this.showError('Open not yet implemented');
+    // Create file input
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+
+    input.onchange = async (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      const file = target.files?.[0];
+
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        // Deserialize graph
+        this.graph = Graph.deserialize(data, NodeRegistry);
+        this.nodeCanvas.clear();
+
+        // Add all nodes to canvas
+        for (const node of this.graph.getNodes()) {
+          this.nodeCanvas.addNode(node, node.x, node.y);
+        }
+
+        this.setStatus(`Loaded: ${this.graph.name}`);
+      } catch (error) {
+        this.showError(`Failed to load graph: ${error}`);
+      }
+    };
+
+    input.click();
   }
 
   private onSave(): void {
@@ -201,6 +238,101 @@ class VertoEngine {
       this.setStatus('Graph saved');
     } catch (error) {
       this.showError(`Failed to save: ${error}`);
+    }
+  }
+
+  private onImportAsset(): void {
+    // Create file input
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,audio/*,.mp3,.wav,.ogg,.glb,.gltf';
+    input.multiple = true;
+
+    input.onchange = async (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      const files = target.files;
+
+      if (!files || files.length === 0) return;
+
+      for (const file of Array.from(files)) {
+        try {
+          // Determine asset type
+          let type = 'unknown';
+          if (file.type.startsWith('image/')) {
+            type = 'image';
+          } else if (file.type.startsWith('audio/')) {
+            type = 'audio';
+          } else if (file.name.endsWith('.glb') || file.name.endsWith('.gltf')) {
+            type = 'model';
+          }
+
+          // Read file as data URL for images/audio
+          const reader = new FileReader();
+
+          reader.onload = (event) => {
+            const data = event.target?.result;
+            if (data) {
+              const assetId = `asset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              this.assets.set(assetId, {
+                name: file.name,
+                type,
+                data,
+              });
+
+              this.updateAssetList();
+              this.setStatus(`Imported: ${file.name}`);
+            }
+          };
+
+          reader.readAsDataURL(file);
+        } catch (error) {
+          this.showError(`Failed to import ${file.name}: ${error}`);
+        }
+      }
+    };
+
+    input.click();
+  }
+
+  private updateAssetList(): void {
+    this.assetList.innerHTML = '';
+
+    for (const [id, asset] of this.assets.entries()) {
+      const item = document.createElement('div');
+      item.className = 'asset-item';
+
+      // Preview (for images)
+      if (asset.type === 'image' && typeof asset.data === 'string') {
+        const preview = document.createElement('img');
+        preview.src = asset.data;
+        preview.className = 'asset-preview';
+        item.appendChild(preview);
+      } else {
+        const icon = document.createElement('div');
+        icon.className = 'asset-icon';
+        icon.textContent = asset.type === 'audio' ? '🔊' : asset.type === 'model' ? '📦' : '📄';
+        item.appendChild(icon);
+      }
+
+      // Name
+      const name = document.createElement('div');
+      name.className = 'asset-name';
+      name.textContent = asset.name;
+      name.title = asset.name;
+      item.appendChild(name);
+
+      // Delete button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn-icon asset-delete';
+      deleteBtn.textContent = '×';
+      deleteBtn.onclick = () => {
+        this.assets.delete(id);
+        this.updateAssetList();
+        this.setStatus(`Deleted: ${asset.name}`);
+      };
+      item.appendChild(deleteBtn);
+
+      this.assetList.appendChild(item);
     }
   }
 

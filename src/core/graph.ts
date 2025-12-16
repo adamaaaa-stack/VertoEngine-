@@ -282,4 +282,53 @@ export class Graph {
 
     return reachable;
   }
+
+  /**
+   * Deserialize graph from JSON data.
+   */
+  static deserialize(data: any, nodeRegistry: any): Graph {
+    const graph = new Graph(data.id, data.name);
+
+    // Add variables
+    if (data.variables) {
+      for (const varDef of data.variables) {
+        graph.addVariable(varDef.name, varDef.type, varDef.defaultValue);
+      }
+    }
+
+    // Create nodes
+    if (data.nodes) {
+      for (const nodeData of data.nodes) {
+        const node = nodeRegistry.create(nodeData.type, nodeData.id);
+        node.x = nodeData.x || 0;
+        node.y = nodeData.y || 0;
+
+        // Restore node-specific properties
+        if (nodeData.pins) {
+          for (const pinData of nodeData.pins) {
+            const pin = node.getPin(pinData.name);
+            if (pin && pinData.defaultValue !== undefined) {
+              pin.defaultValue = pinData.defaultValue;
+            }
+          }
+        }
+
+        graph.addNode(node);
+      }
+    }
+
+    // Restore connections
+    if (data.connections) {
+      for (const conn of data.connections) {
+        graph.connect(
+          conn.from.nodeId,
+          conn.from.pinName,
+          conn.to.nodeId,
+          conn.to.pinName
+        );
+      }
+    }
+
+    return graph;
+  }
 }
