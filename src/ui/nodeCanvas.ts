@@ -41,11 +41,15 @@ export class NodeCanvas {
   private dragStartY: number = 0;
   private draggedNode: CanvasNode | null = null;
   private selectedNode: Node | null = null;
+  private selectedNodes: Set<Node> = new Set();
   private connectingFrom: Pin | null = null;
 
   // Touch state
   private lastTouchDistance: number = 0;
   private touchStartTime: number = 0;
+
+  // Clipboard
+  private clipboard: any[] = [];
 
   // Grid
   private gridSize: number = 20;
@@ -84,12 +88,10 @@ export class NodeCanvas {
     this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
     this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
     this.canvas.addEventListener('wheel', this.onWheel.bind(this), { passive: false });
+    this.canvas.addEventListener('contextmenu', this.onContextMenu.bind(this));
 
     // Keyboard events
     window.addEventListener('keydown', this.onKeyDown.bind(this));
-
-    // Prevent context menu on long press
-    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   // Touch event handlers
@@ -122,16 +124,27 @@ export class NodeCanvas {
       const node = this.getNodeAt(x, y);
       if (node) {
         this.draggedNode = node;
+
+        // Select node
+        if (!this.selectedNodes.has(node.node)) {
+          this.selectedNodes.clear();
+          this.selectedNodes.add(node.node);
+        }
         this.selectedNode = node.node;
+
         this.dragStartX = x - node.x;
         this.dragStartY = y - node.y;
+        this.render();
         return;
       }
 
-      // Pan canvas
+      // Clear selection and pan canvas
+      this.selectedNodes.clear();
+      this.selectedNode = null;
       this.isDragging = true;
       this.dragStartX = touch.clientX;
       this.dragStartY = touch.clientY;
+      this.render();
     }
   }
 
@@ -229,16 +242,39 @@ export class NodeCanvas {
     const node = this.getNodeAt(x, y);
     if (node) {
       this.draggedNode = node;
-      this.selectedNode = node.node;
+
+      // Multi-select with Shift key
+      if (e.shiftKey) {
+        if (this.selectedNodes.has(node.node)) {
+          this.selectedNodes.delete(node.node);
+        } else {
+          this.selectedNodes.add(node.node);
+        }
+        this.selectedNode = node.node;
+      } else {
+        // Single select
+        if (!this.selectedNodes.has(node.node)) {
+          this.selectedNodes.clear();
+          this.selectedNodes.add(node.node);
+        }
+        this.selectedNode = node.node;
+      }
+
       this.dragStartX = x - node.x;
       this.dragStartY = y - node.y;
+      this.render();
       return;
     }
 
-    // Pan canvas
+    // Clear selection and pan canvas
+    if (!e.shiftKey) {
+      this.selectedNodes.clear();
+      this.selectedNode = null;
+    }
     this.isDragging = true;
     this.dragStartX = e.clientX;
     this.dragStartY = e.clientY;
+    this.render();
   }
 
   private onMouseMove(e: MouseEvent): void {
@@ -247,11 +283,21 @@ export class NodeCanvas {
     const y = (e.clientY - rect.top - this.offsetY) / this.zoom;
 
     if (this.draggedNode) {
-      // Drag node
-      this.draggedNode.x = x - this.dragStartX;
-      this.draggedNode.y = y - this.dragStartY;
-      this.draggedNode.node.x = this.draggedNode.x;
-      this.draggedNode.node.y = this.draggedNode.y;
+      // Drag node(s)
+      const deltaX = (x - this.dragStartX) - this.draggedNode.x;
+      const deltaY = (y - this.dragStartY) - this.draggedNode.y;
+
+      // Move all selected nodes together
+      for (const selectedNode of this.selectedNodes) {
+        const canvasNode = this.canvasNodes.get(selectedNode.id);
+        if (canvasNode) {
+          canvasNode.x += deltaX;
+          canvasNode.y += deltaY;
+          canvasNode.node.x = canvasNode.x;
+          canvasNode.node.y = canvasNode.y;
+        }
+      }
+
       this.render();
     } else if (this.isDragging) {
       // Pan canvas
@@ -300,14 +346,230 @@ export class NodeCanvas {
     this.render();
   }
 
+  private onContextMenu(e: MouseEvent): void {
+    e.preventDefault();
+
+    const rect = this.canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left - this.offsetX) / this.zoom;
+    const y = (e.clientY - rect.top - this.offsetY) / this.zoom;
+
+    // Check if right-clicking on a node
+    const node = this.getNodeAt(x, y);
+    if (node && !this.selectedNodes.has(node.node)) {
+      this.selectedNodes.clear();
+      this.selectedNodes.add(node.node);
+      this.selectedNode = node.node;
+      this.render();
+    }
+
+    // Show context menu
+    if (this.selectedNodes.size > 0) {
+      this.showContextMenu(e.clientX, e.clientY);
+    }
+  }
+
+  private showContextMenu(x: number, y: number): void {
+    // Remove existing context menu if any
+    const existingMenu = document.getElementById('node-context-menu');
+    if (existingMenu) {
+      existingMenu.remove();
+    }
+
+    // Create context menu
+    const menu = document.createElement('div');
+    menu.id = 'node-context-menu';
+    menu.style.position = 'fixed';
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.style.background = '#2d2d2d';
+    menu.style.border = '1px solid #4a4a4a';
+    menu.style.borderRadius = '4px';
+    menu.style.padding = '4px 0';
+    menu.style.zIndex = '10000';
+    menu.style.minWidth = '150px';
+    menu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+
+    const items = [
+      { label: 'Copy', action: () => this.copySelectedNodes() },
+      { label: 'Duplicate', action: () => this.duplicateSelectedNodes() },
+      { label: 'Delete', action: () => this.deleteSelectedNodes() },
+    ];
+
+    if (this.clipboard.length > 0) {
+      items.splice(1, 0, { label: 'Paste', action: () => this.pasteNodes() });
+    }
+
+    for (const item of items) {
+      const menuItem = document.createElement('div');
+      menuItem.textContent = item.label;
+      menuItem.style.padding = '8px 16px';
+      menuItem.style.cursor = 'pointer';
+      menuItem.style.color = '#d4d4d4';
+      menuItem.style.fontSize = '14px';
+
+      menuItem.addEventListener('mouseenter', () => {
+        menuItem.style.background = '#3e3e3e';
+      });
+
+      menuItem.addEventListener('mouseleave', () => {
+        menuItem.style.background = 'transparent';
+      });
+
+      menuItem.addEventListener('click', () => {
+        item.action();
+        menu.remove();
+      });
+
+      menu.appendChild(menuItem);
+    }
+
+    // Remove menu when clicking outside
+    const removeMenu = (e: MouseEvent) => {
+      if (!menu.contains(e.target as HTMLElement)) {
+        menu.remove();
+        document.removeEventListener('click', removeMenu);
+      }
+    };
+
+    setTimeout(() => {
+      document.addEventListener('click', removeMenu);
+    }, 0);
+
+    document.body.appendChild(menu);
+  }
+
+  private deleteSelectedNodes(): void {
+    for (const node of this.selectedNodes) {
+      this.graph.removeNode(node.id);
+      this.canvasNodes.delete(node.id);
+    }
+    this.selectedNodes.clear();
+    this.selectedNode = null;
+    this.updateConnections();
+    this.render();
+  }
+
   private onKeyDown(e: KeyboardEvent): void {
-    if (e.key === 'Delete' && this.selectedNode) {
-      this.graph.removeNode(this.selectedNode.id);
-      this.canvasNodes.delete(this.selectedNode.id);
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
+
+    // Delete selected nodes
+    if ((e.key === 'Delete' || e.key === 'Backspace') && this.selectedNodes.size > 0) {
+      for (const node of this.selectedNodes) {
+        this.graph.removeNode(node.id);
+        this.canvasNodes.delete(node.id);
+      }
+      this.selectedNodes.clear();
       this.selectedNode = null;
       this.updateConnections();
       this.render();
+      e.preventDefault();
+      return;
     }
+
+    // Copy (Ctrl+C / Cmd+C)
+    if (ctrlKey && e.key === 'c' && this.selectedNodes.size > 0) {
+      this.copySelectedNodes();
+      e.preventDefault();
+      return;
+    }
+
+    // Paste (Ctrl+V / Cmd+V)
+    if (ctrlKey && e.key === 'v' && this.clipboard.length > 0) {
+      this.pasteNodes();
+      e.preventDefault();
+      return;
+    }
+
+    // Duplicate (Ctrl+D / Cmd+D)
+    if (ctrlKey && e.key === 'd' && this.selectedNodes.size > 0) {
+      this.duplicateSelectedNodes();
+      e.preventDefault();
+      return;
+    }
+
+    // Select All (Ctrl+A / Cmd+A)
+    if (ctrlKey && e.key === 'a') {
+      this.selectAll();
+      e.preventDefault();
+      return;
+    }
+
+    // Deselect (Escape)
+    if (e.key === 'Escape') {
+      this.selectedNodes.clear();
+      this.selectedNode = null;
+      this.connectingFrom = null;
+      this.render();
+      e.preventDefault();
+      return;
+    }
+  }
+
+  private copySelectedNodes(): void {
+    this.clipboard = [];
+
+    for (const node of this.selectedNodes) {
+      this.clipboard.push({
+        type: node.type,
+        x: node.x,
+        y: node.y,
+        data: node.serialize(),
+      });
+    }
+  }
+
+  private pasteNodes(): void {
+    if (this.clipboard.length === 0) return;
+
+    // Import NodeRegistry
+    const { NodeRegistry } = require('../core/registry.js');
+
+    this.selectedNodes.clear();
+
+    // Calculate offset for pasted nodes
+    const offset = 50;
+
+    for (const clipboardNode of this.clipboard) {
+      const newId = `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newNode = NodeRegistry.create(clipboardNode.type, newId);
+
+      // Set position with offset
+      newNode.x = clipboardNode.x + offset;
+      newNode.y = clipboardNode.y + offset;
+
+      // Restore pin default values if any
+      if (clipboardNode.data.pins) {
+        for (const pinData of clipboardNode.data.pins) {
+          const pin = newNode.getPin(pinData.name);
+          if (pin && pinData.defaultValue !== undefined) {
+            pin.defaultValue = pinData.defaultValue;
+          }
+        }
+      }
+
+      this.addNode(newNode, newNode.x, newNode.y);
+      this.selectedNodes.add(newNode);
+    }
+
+    this.selectedNode = Array.from(this.selectedNodes)[0] || null;
+    this.render();
+  }
+
+  private duplicateSelectedNodes(): void {
+    this.copySelectedNodes();
+    this.pasteNodes();
+  }
+
+  private selectAll(): void {
+    this.selectedNodes.clear();
+
+    for (const canvasNode of this.canvasNodes.values()) {
+      this.selectedNodes.add(canvasNode.node);
+    }
+
+    this.selectedNode = Array.from(this.selectedNodes)[0] || null;
+    this.render();
   }
 
   /**
@@ -404,11 +666,12 @@ export class NodeCanvas {
 
   private drawNode(canvasNode: CanvasNode): void {
     const { node, x, y, width, height } = canvasNode;
+    const isSelected = this.selectedNodes.has(node);
 
     // Node background
-    this.ctx.fillStyle = node === this.selectedNode ? '#3e3e3e' : '#2d2d2d';
-    this.ctx.strokeStyle = '#4a4a4a';
-    this.ctx.lineWidth = 2;
+    this.ctx.fillStyle = isSelected ? '#3e3e3e' : '#2d2d2d';
+    this.ctx.strokeStyle = isSelected ? '#4a90e2' : '#4a4a4a';
+    this.ctx.lineWidth = isSelected ? 3 : 2;
     this.ctx.fillRect(x, y, width, height);
     this.ctx.strokeRect(x, y, width, height);
 
