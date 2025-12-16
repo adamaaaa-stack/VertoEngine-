@@ -16,6 +16,7 @@
       <button id="btn-new" class="btn">New</button>
       <button id="btn-open" class="btn">Open</button>
       <button id="btn-save" class="btn">Save</button>
+      <button id="btn-examples" class="btn">Examples</button>
       <button id="btn-run" class="btn btn-primary">Run</button>
       <button id="btn-stop" class="btn btn-danger" disabled>Stop</button>
     </div>
@@ -28,6 +29,17 @@
   <div id="errorbar" class="hidden">
     <span id="error-text"></span>
     <button id="btn-clear-error" class="btn-icon">×</button>
+  </div>
+
+  <!-- Examples Modal -->
+  <div id="examples-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Example Graphs</h2>
+        <button id="btn-close-examples" class="btn-icon">×</button>
+      </div>
+      <div id="examples-list" class="examples-list"></div>
+    </div>
   </div>
 
   <!-- Main Content -->

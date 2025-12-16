@@ -9,6 +9,7 @@ import { registerAllNodes } from './nodes/index.js';
 import { NodeCanvas } from './ui/nodeCanvas.js';
 import { NodeLibrary } from './ui/nodeLibrary.js';
 import { World } from './engine/world.js';
+import { getAllExamples } from './examples/graphs.js';
 
 class VertoEngine {
   private graph: Graph;
@@ -25,6 +26,7 @@ class VertoEngine {
   private btnNew: HTMLButtonElement;
   private btnOpen: HTMLButtonElement;
   private btnSave: HTMLButtonElement;
+  private btnExamples: HTMLButtonElement;
   private btnRun: HTMLButtonElement;
   private btnStop: HTMLButtonElement;
   private statusText: HTMLElement;
@@ -33,6 +35,8 @@ class VertoEngine {
   private canvasContainer: HTMLElement;
   private gameViewContainer: HTMLElement;
   private gameCanvas: HTMLCanvasElement;
+  private examplesModal: HTMLElement;
+  private examplesList: HTMLElement;
 
   constructor() {
     // Initialize core
@@ -43,6 +47,7 @@ class VertoEngine {
     this.btnNew = document.getElementById('btn-new') as HTMLButtonElement;
     this.btnOpen = document.getElementById('btn-open') as HTMLButtonElement;
     this.btnSave = document.getElementById('btn-save') as HTMLButtonElement;
+    this.btnExamples = document.getElementById('btn-examples') as HTMLButtonElement;
     this.btnRun = document.getElementById('btn-run') as HTMLButtonElement;
     this.btnStop = document.getElementById('btn-stop') as HTMLButtonElement;
     this.statusText = document.getElementById('status-text')!;
@@ -51,6 +56,8 @@ class VertoEngine {
     this.canvasContainer = document.getElementById('canvas-container')!;
     this.gameViewContainer = document.getElementById('game-view-container')!;
     this.gameCanvas = document.getElementById('game-canvas') as HTMLCanvasElement;
+    this.examplesModal = document.getElementById('examples-modal')!;
+    this.examplesList = document.getElementById('examples-list')!;
 
     // Initialize canvas
     const nodeCanvasEl = document.getElementById('node-canvas') as HTMLCanvasElement;
@@ -78,12 +85,20 @@ class VertoEngine {
     this.btnNew.addEventListener('click', () => this.onNew());
     this.btnOpen.addEventListener('click', () => this.onOpen());
     this.btnSave.addEventListener('click', () => this.onSave());
+    this.btnExamples.addEventListener('click', () => this.onExamples());
     this.btnRun.addEventListener('click', () => this.onRun());
     this.btnStop.addEventListener('click', () => this.onStop());
 
     document.getElementById('btn-clear-error')?.addEventListener('click', () => {
       this.hideError();
     });
+
+    document.getElementById('btn-close-examples')?.addEventListener('click', () => {
+      this.examplesModal.classList.add('hidden');
+    });
+
+    // Populate examples list
+    this.populateExamples();
   }
 
   private onNodeSelected(nodeType: string): void {
@@ -97,6 +112,54 @@ class VertoEngine {
     } catch (error) {
       this.showError(`Failed to create node: ${error}`);
     }
+  }
+
+  private populateExamples(): void {
+    const examples = getAllExamples();
+
+    this.examplesList.innerHTML = '';
+
+    for (const example of examples) {
+      const item = document.createElement('div');
+      item.className = 'example-item';
+
+      const title = document.createElement('h3');
+      title.textContent = example.name;
+
+      const desc = document.createElement('p');
+      desc.textContent = example.description;
+
+      item.appendChild(title);
+      item.appendChild(desc);
+
+      item.addEventListener('click', () => {
+        this.loadExample(example.factory);
+        this.examplesModal.classList.add('hidden');
+      });
+
+      this.examplesList.appendChild(item);
+    }
+  }
+
+  private loadExample(factory: () => Graph): void {
+    if (this.isRunning) {
+      this.showError('Stop execution before loading an example');
+      return;
+    }
+
+    this.graph = factory();
+    this.nodeCanvas.clear();
+
+    // Add all nodes to canvas
+    for (const node of this.graph.getNodes()) {
+      this.nodeCanvas.addNode(node, node.x, node.y);
+    }
+
+    this.setStatus(`Loaded example: ${this.graph.name}`);
+  }
+
+  private onExamples(): void {
+    this.examplesModal.classList.remove('hidden');
   }
 
   private onNew(): void {

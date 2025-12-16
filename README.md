@@ -69,39 +69,38 @@ Simple, clean, beginner-friendly interface:
 
 ```bash
 npm install
-```
-
-### Development
-
-```bash
 npm run dev
 ```
 
 Opens the editor at http://localhost:3000
 
-### Build
+### Quick Start
+
+**New to VertoEngine?** Check out [QUICKSTART.md](QUICKSTART.md) for step-by-step tutorials!
+
+**Want to see it in action?** Click the **Examples** button in the editor to load:
+- Hello World - Simple BeginPlay + PrintString
+- Counter - Increments a variable every frame
+- Movement - Move an actor using vectors
+- Branch - Conditional logic demonstration
+- Delay - Latent action with timed execution
+
+### Your First Graph (60 seconds)
+
+1. Click **Examples** → Select **Hello World**
+2. Click **Run** button
+3. Open browser console (F12) to see "Hello"
+4. Click **Stop** to return to editing
+
+That's it! You just ran your first visual script.
+
+### Build for Production
 
 ```bash
 npm run build
 ```
 
 Builds the production version to `dist/`
-
-## How to Use
-
-1. **Add Nodes** - Click or drag nodes from the left panel
-2. **Connect Nodes** - Click and drag from output pins to input pins
-3. **Position Nodes** - Drag nodes to arrange your graph
-4. **Run** - Click the Run button to execute your visual script
-5. **Stop** - Click Stop to return to editing
-
-### Creating Your First Graph
-
-1. Add a **BeginPlay** event node (Events category)
-2. Add a **Print String** node (Debug category)
-3. Connect the **Then** pin from BeginPlay to the **Exec** pin on Print String
-4. Click **Run**
-5. Check the browser console to see your message!
 
 ### Example: Simple Counter
 
