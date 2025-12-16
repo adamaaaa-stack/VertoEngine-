@@ -81,6 +81,7 @@ class VertoEngine {
 
     // Initialize world
     this.world = new World(this.gameCanvas);
+    this.world.setAssets(this.assets);
 
     // Setup event listeners
     this.setupEventListeners();
@@ -280,6 +281,7 @@ class VertoEngine {
               });
 
               this.updateAssetList();
+              this.world.setAssets(this.assets);
               this.setStatus(`Imported: ${file.name}`);
             }
           };
@@ -328,6 +330,7 @@ class VertoEngine {
       deleteBtn.onclick = () => {
         this.assets.delete(id);
         this.updateAssetList();
+        this.world.setAssets(this.assets);
         this.setStatus(`Deleted: ${asset.name}`);
       };
       item.appendChild(deleteBtn);
