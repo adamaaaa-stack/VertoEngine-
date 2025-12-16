@@ -1,10 +1,11 @@
 /**
  * Node canvas - renders and handles interaction with the node graph.
+ * Optimized for iPad with touch support.
  */
 
 import { Graph } from '../core/graph.js';
 import { Node } from '../core/node.js';
-import { Pin, PinDirection } from '../core/pin.js';
+import { Pin } from '../core/pin.js';
 import { TypeChecker } from '../core/types.js';
 
 interface CanvasNode {
@@ -29,10 +30,10 @@ export class NodeCanvas {
   private canvasNodes: Map<string, CanvasNode> = new Map();
   private connections: Connection[] = [];
 
-  // Camera
-  private offsetX: number = 0;
-  private offsetY: number = 0;
-  private zoom: number = 1;
+  // Camera - start zoomed out for iPad
+  private offsetX: number = 100;
+  private offsetY: number = 100;
+  private zoom: number = 0.6;
 
   // Interaction
   private isDragging: boolean = false;
@@ -41,6 +42,10 @@ export class NodeCanvas {
   private draggedNode: CanvasNode | null = null;
   private selectedNode: Node | null = null;
   private connectingFrom: Pin | null = null;
+
+  // Touch state
+  private lastTouchDistance: number = 0;
+  private touchStartTime: number = 0;
 
   // Grid
   private gridSize: number = 20;
@@ -57,8 +62,10 @@ export class NodeCanvas {
   private setupCanvas(): void {
     // Set canvas size
     const resize = () => {
-      this.canvas.width = this.canvas.clientWidth;
-      this.canvas.height = this.canvas.clientHeight;
+      const dpr = window.devicePixelRatio || 1;
+      this.canvas.width = this.canvas.clientWidth * dpr;
+      this.canvas.height = this.canvas.clientHeight * dpr;
+      this.ctx.scale(dpr, dpr);
       this.render();
     };
 
@@ -67,16 +74,145 @@ export class NodeCanvas {
   }
 
   private setupEventListeners(): void {
-    // Mouse events
+    // Touch events (primary for iPad)
+    this.canvas.addEventListener('touchstart', this.onTouchStart.bind(this), { passive: false });
+    this.canvas.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
+    this.canvas.addEventListener('touchend', this.onTouchEnd.bind(this), { passive: false });
+
+    // Mouse events (fallback for desktop)
     this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
     this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
     this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this));
-    this.canvas.addEventListener('wheel', this.onWheel.bind(this));
+    this.canvas.addEventListener('wheel', this.onWheel.bind(this), { passive: false });
 
     // Keyboard events
     window.addEventListener('keydown', this.onKeyDown.bind(this));
+
+    // Prevent context menu on long press
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
+  // Touch event handlers
+  private onTouchStart(e: TouchEvent): void {
+    e.preventDefault();
+    this.touchStartTime = Date.now();
+
+    if (e.touches.length === 2) {
+      // Two-finger pinch to zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      this.lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const rect = this.canvas.getBoundingClientRect();
+      const x = (touch.clientX - rect.left - this.offsetX) / this.zoom;
+      const y = (touch.clientY - rect.top - this.offsetY) / this.zoom;
+
+      // Check if touching a pin (larger hit area for touch)
+      const pin = this.getPinAt(x, y, 20);
+      if (pin) {
+        this.connectingFrom = pin;
+        return;
+      }
+
+      // Check if touching a node
+      const node = this.getNodeAt(x, y);
+      if (node) {
+        this.draggedNode = node;
+        this.selectedNode = node.node;
+        this.dragStartX = x - node.x;
+        this.dragStartY = y - node.y;
+        return;
+      }
+
+      // Pan canvas
+      this.isDragging = true;
+      this.dragStartX = touch.clientX;
+      this.dragStartY = touch.clientY;
+    }
+  }
+
+  private onTouchMove(e: TouchEvent): void {
+    e.preventDefault();
+
+    if (e.touches.length === 2) {
+      // Pinch to zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (this.lastTouchDistance > 0) {
+        const delta = distance / this.lastTouchDistance;
+        this.zoom = Math.max(0.3, Math.min(2, this.zoom * delta));
+        this.render();
+      }
+
+      this.lastTouchDistance = distance;
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const rect = this.canvas.getBoundingClientRect();
+      const x = (touch.clientX - rect.left - this.offsetX) / this.zoom;
+      const y = (touch.clientY - rect.top - this.offsetY) / this.zoom;
+
+      if (this.draggedNode) {
+        // Drag node
+        this.draggedNode.x = x - this.dragStartX;
+        this.draggedNode.y = y - this.dragStartY;
+        this.draggedNode.node.x = this.draggedNode.x;
+        this.draggedNode.node.y = this.draggedNode.y;
+        this.render();
+      } else if (this.isDragging) {
+        // Pan canvas
+        this.offsetX += touch.clientX - this.dragStartX;
+        this.offsetY += touch.clientY - this.dragStartY;
+        this.dragStartX = touch.clientX;
+        this.dragStartY = touch.clientY;
+        this.render();
+      } else if (this.connectingFrom) {
+        // Drawing connection
+        this.render();
+        const fromPos = this.getPinPosition(this.connectingFrom);
+        this.ctx.strokeStyle = '#4a90e2';
+        this.ctx.lineWidth = 3;
+        this.ctx.beginPath();
+        this.ctx.moveTo(fromPos.x * this.zoom + this.offsetX, fromPos.y * this.zoom + this.offsetY);
+        this.ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+        this.ctx.stroke();
+      }
+    }
+  }
+
+  private onTouchEnd(e: TouchEvent): void {
+    e.preventDefault();
+
+    if (this.connectingFrom && e.changedTouches.length === 1) {
+      const touch = e.changedTouches[0];
+      const rect = this.canvas.getBoundingClientRect();
+      const x = (touch.clientX - rect.left - this.offsetX) / this.zoom;
+      const y = (touch.clientY - rect.top - this.offsetY) / this.zoom;
+
+      const toPin = this.getPinAt(x, y, 20);
+      if (toPin && this.connectingFrom.canConnectTo(toPin)) {
+        this.connectingFrom.connect(toPin);
+        this.updateConnections();
+      }
+
+      this.connectingFrom = null;
+    }
+
+    this.isDragging = false;
+    this.draggedNode = null;
+    this.lastTouchDistance = 0;
+    this.render();
+  }
+
+  // Mouse event handlers (desktop fallback)
   private onMouseDown(e: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left - this.offsetX) / this.zoom;
@@ -127,7 +263,6 @@ export class NodeCanvas {
     } else if (this.connectingFrom) {
       // Drawing connection
       this.render();
-      // Draw temporary connection line
       const fromPos = this.getPinPosition(this.connectingFrom);
       this.ctx.strokeStyle = '#4a90e2';
       this.ctx.lineWidth = 2;
@@ -161,7 +296,7 @@ export class NodeCanvas {
   private onWheel(e: WheelEvent): void {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    this.zoom = Math.max(0.1, Math.min(2, this.zoom * delta));
+    this.zoom = Math.max(0.3, Math.min(2, this.zoom * delta));
     this.render();
   }
 
@@ -215,9 +350,13 @@ export class NodeCanvas {
    * Render the canvas.
    */
   render(): void {
+    const dpr = window.devicePixelRatio || 1;
+    const width = this.canvas.clientWidth;
+    const height = this.canvas.clientHeight;
+
     // Clear
     this.ctx.fillStyle = '#1e1e1e';
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.fillRect(0, 0, width, height);
 
     this.ctx.save();
     this.ctx.translate(this.offsetX, this.offsetY);
@@ -245,8 +384,8 @@ export class NodeCanvas {
 
     const startX = Math.floor(-this.offsetX / this.zoom / this.gridSize) * this.gridSize;
     const startY = Math.floor(-this.offsetY / this.zoom / this.gridSize) * this.gridSize;
-    const endX = startX + this.canvas.width / this.zoom + this.gridSize;
-    const endY = startY + this.canvas.height / this.zoom + this.gridSize;
+    const endX = startX + this.canvas.clientWidth / this.zoom + this.gridSize;
+    const endY = startY + this.canvas.clientHeight / this.zoom + this.gridSize;
 
     for (let x = startX; x < endX; x += this.gridSize) {
       this.ctx.beginPath();
@@ -275,24 +414,24 @@ export class NodeCanvas {
 
     // Node title
     this.ctx.fillStyle = '#d4d4d4';
-    this.ctx.font = '14px sans-serif';
-    this.ctx.fillText(node.displayName, x + 10, y + 20);
+    this.ctx.font = 'bold 16px sans-serif';
+    this.ctx.fillText(node.displayName, x + 10, y + 22);
 
     // Pins
     const inputPins = node.getInputPins();
     const outputPins = node.getOutputPins();
 
-    let pinY = y + 40;
+    let pinY = y + 45;
 
     for (const pin of inputPins) {
       this.drawPin(pin, x, pinY, 'input');
-      pinY += 20;
+      pinY += 22;
     }
 
-    pinY = y + 40;
+    pinY = y + 45;
     for (const pin of outputPins) {
       this.drawPin(pin, x + width, pinY, 'output');
-      pinY += 20;
+      pinY += 22;
     }
   }
 
@@ -300,19 +439,22 @@ export class NodeCanvas {
     const pinX = side === 'input' ? x : x;
     const pinY = y;
 
-    // Pin circle
+    // Pin circle (larger for touch)
     this.ctx.fillStyle = TypeChecker.getColor(pin.type);
+    this.ctx.strokeStyle = '#1e1e1e';
+    this.ctx.lineWidth = 2;
     this.ctx.beginPath();
-    this.ctx.arc(pinX, pinY, 6, 0, Math.PI * 2);
+    this.ctx.arc(pinX, pinY, 8, 0, Math.PI * 2);
     this.ctx.fill();
+    this.ctx.stroke();
 
     // Pin label
     this.ctx.fillStyle = '#d4d4d4';
-    this.ctx.font = '12px sans-serif';
-    const textX = side === 'input' ? pinX + 10 : pinX - 10;
+    this.ctx.font = '13px sans-serif';
+    const textX = side === 'input' ? pinX + 14 : pinX - 14;
     const align = side === 'input' ? 'left' : 'right';
     this.ctx.textAlign = align as CanvasTextAlign;
-    this.ctx.fillText(pin.name, textX, pinY + 4);
+    this.ctx.fillText(pin.name, textX, pinY + 5);
     this.ctx.textAlign = 'left';
   }
 
@@ -321,7 +463,7 @@ export class NodeCanvas {
     const toPos = this.getPinPosition(to);
 
     this.ctx.strokeStyle = TypeChecker.getColor(from.type);
-    this.ctx.lineWidth = 2;
+    this.ctx.lineWidth = 3;
     this.ctx.beginPath();
     this.ctx.moveTo(fromPos.x, fromPos.y);
 
@@ -343,7 +485,7 @@ export class NodeCanvas {
     if (pinIndex !== -1) {
       return {
         x: canvasNode.x,
-        y: canvasNode.y + 40 + pinIndex * 20,
+        y: canvasNode.y + 45 + pinIndex * 22,
       };
     }
 
@@ -351,7 +493,7 @@ export class NodeCanvas {
     if (pinIndex !== -1) {
       return {
         x: canvasNode.x + canvasNode.width,
-        y: canvasNode.y + 40 + pinIndex * 20,
+        y: canvasNode.y + 45 + pinIndex * 22,
       };
     }
 
@@ -372,14 +514,14 @@ export class NodeCanvas {
     return null;
   }
 
-  private getPinAt(x: number, y: number): Pin | null {
+  private getPinAt(x: number, y: number, touchRadius: number = 10): Pin | null {
     for (const canvasNode of this.canvasNodes.values()) {
       const allPins = [...canvasNode.node.getInputPins(), ...canvasNode.node.getOutputPins()];
 
       for (const pin of allPins) {
         const pos = this.getPinPosition(pin);
         const dist = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
-        if (dist < 10) {
+        if (dist < touchRadius) {
           return pin;
         }
       }
@@ -395,6 +537,10 @@ export class NodeCanvas {
     this.canvasNodes.clear();
     this.connections = [];
     this.selectedNode = null;
+    // Reset camera to default position
+    this.offsetX = 100;
+    this.offsetY = 100;
+    this.zoom = 0.6;
     this.render();
   }
 }
